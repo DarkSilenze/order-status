@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Status</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 20px; font-family: Arial, sans-serif; background: #f5f5f5; }
+    .container { width: 100%; max-width: 95%; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    h1 { margin: 0 0 20px; font-size: 24px; font-weight: 900; }
+    .status-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 15px; font-size: 13px; color: #666; font-weight: 600; }
+    .online-dot { width: 9px; height: 9px; background: #28a745; border-radius: 50%; display: inline-block; }
+    .offline-dot { width: 9px; height: 9px; background: #dc3545; border-radius: 50%; display: inline-block; }
+    .table-wrapper { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background: #f0f0f0; font-size: 14px; font-weight: 900; }
+    td { font-weight: 600; }
+    th:nth-child(1) { width: 13%; }
+    th:nth-child(2) { width: 14%; }
+    th:nth-child(3) { width: 18%; }
+    th:nth-child(4) { width: 18%; }
+    th:nth-child(5) { width: 14%; }
+    th:nth-child(6) { width: 13%; }
+    th:nth-child(7) { width: 10%; }
+
+    .data-value { display: block; width: 100%; padding: 7px; font-size: 13px; line-height: 1.3; word-break: break-word; font-weight: 600; }
+
+    .row-OPEN { background-color: #ffffff !important; } .row-OPEN td { background-color: #ffffff !important; }
+    .row-CHECKED-IN { background-color: #FF9B59 !important; } .row-CHECKED-IN td { background-color: #FF9B59 !important; }
+    .row-SHIPPED { background-color: #90FF59 !important; } .row-SHIPPED td { background-color: #90FF59 !important; }
+    .row-LATE { background-color: #FF5959 !important; } .row-LATE td { background-color: #FF5959 !important; }
+    .row-CANCEL { background-color: #5B9BFF !important; } .row-CANCEL td { background-color: #5B9BFF !important; }
+
+    .status-select { padding: 4px 6px; border-radius: 4px; border: 1px solid #ddd; font-size: 12px; width: 100%; cursor: pointer; font-weight: 700; color: #333333 !important; }
+    .status-select.OPEN { background: #ffffff; }
+    .status-select.CHECKED-IN { background: #ffc107; }
+    .status-select.SHIPPED { background: #28a745; color: #ffffff !important; }
+    .status-select.LATE { background: #dc3545; color: #ffffff !important; }
+    .status-select.CANCEL { background: #007bff; color: #ffffff !important; }
+
+    button { border: none; border-radius: 6px; padding: 8px 10px; color: white; cursor: pointer; font-size: 13px; font-weight: 700; }
+    .add-btn { margin-top: 15px; background: #007bff; font-weight: 700; }
+    .add-btn:hover { background: #0056b3; }
+    .upload-btn { margin-top: 15px; background: #17a2b8; font-weight: 700; }
+    .upload-btn:hover { background: #117a8b; }
+    .remove-all-btn { margin-top: 15px; background: #dc3545; font-weight: 700; }
+    .remove-all-btn:hover { background: #b02a37; }
+    .sort-btn { background: #6c757d; font-weight: 700; padding: 8px 14px; }
+    .sort-btn:hover { background: #5a6268; }
+    .sort-btn.active { background: #28a745; }
+    .sort-btn.active:hover { background: #218838; }
+    .remove-btn { background: #dc3545; width: auto; padding: 5px 8px; font-size: 11px; border-radius: 4px; margin: 0; font-weight: 700; }
+    .remove-btn:hover { background: #b02a37; }
+    .loading { text-align: center; padding: 20px; color: #777; font-weight: 600; }
+    .error { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 6px; margin-bottom: 15px; display: none; font-weight: 600; }
+    .success { background: #d4edda; color: #155724; padding: 10px; border-radius: 6px; margin-bottom: 15px; display: none; font-weight: 600; }
+    .info { background: #d1ecf1; color: #0c5460; padding: 10px; border-radius: 6px; margin-bottom: 15px; display: none; font-weight: 600; }
+    .add-form { background: #f8f9fa; padding: 15px; margin: 15px 0; border-radius: 8px; display: none; border: 1px solid #ddd; }
+    .add-form h3 { font-weight: 900; margin-top: 0; }
+    .add-form input, .add-form select { padding: 8px; margin: 5px 10px 5px 0; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; font-weight: 600; }
+    .add-form select { min-width: 150px; }
+    .add-form button { padding: 8px 15px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 700; }
+    .add-form button:hover { background: #218838; }
+    .add-form label { font-weight: 700; }
+    .action-cell { display: flex; gap: 4px; flex-wrap: wrap; }
+    .button-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
+    .sort-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; margin-bottom: 10px; }
+    .sort-label { font-weight: 700; font-size: 14px; color: #333; display: flex; align-items: center; }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+    .modal { background: white; padding: 30px; border-radius: 12px; max-width: 400px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+    .modal h3 { margin-top: 0; font-weight: 900; }
+    .modal button { padding: 10px 20px; margin: 5px; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 14px; }
+    .modal .confirm-btn { background: #dc3545; color: white; }
+    .modal .confirm-btn:hover { background: #b02a37; }
+    .modal .cancel-btn { background: #6c757d; color: white; }
+    .modal .cancel-btn:hover { background: #5a6268; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px; }
+    .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 700px) {
+      body { padding: 8px; }
+      .container { padding: 12px; border-radius: 8px; max-width: 100%; }
+      h1 { font-size: 20px; font-weight: 900; }
+      th, td { padding: 5px; }
+      th { font-size: 12px; font-weight: 900; }
+      td { font-weight: 600; }
+      .data-value, button { font-size: 12px; padding: 6px; font-weight: 600; }
+      table { min-width: 800px; }
+      .add-form input, .add-form select { display: block; margin: 5px 0; width: 100%; font-weight: 600; }
+      .status-select { font-weight: 700; }
+      .status-bar { font-weight: 600; }
+      .sort-group { flex-direction: column; align-items: stretch; }
+      .sort-btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Order Status</h1>
+
+  <div class="status-bar">
+    <span id="connectionDot" class="online-dot"></span>
+    <span id="connectionText">Connecting...</span>
+  </div>
+
+  <div id="errorMessage" class="error"></div>
+  <div id="successMessage" class="success"></div>
+  <div id="infoMessage" class="info"></div>
+
+  <div id="addForm" class="add-form">
+    <h3 style="margin-top: 0;">Add New Order</h3>
+    <div id="formFields"></div>
+    <button onclick="submitOrder()">Submit Order</button>
+    <button onclick="closeForm()" style="background: #6c757d; margin-left: 10px;">Cancel</button>
+  </div>
+
+  <div class="sort-group">
+    <span class="sort-label">Sort by:</span>
+    <button class="sort-btn active" id="sortDelivery" onclick="sortOrders('delivery')">📅 Planned Delivery Time</button>
+    <button class="sort-btn" id="sortStatus" onclick="sortOrders('status')">📊 Status</button>
+    <button class="sort-btn" id="sortCustomer" onclick="sortOrders('customer')">👤 Customer</button>
+  </div>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Order</th>
+          <th>Customer PO</th>
+          <th>Customer</th>
+          <th>Planned Delivery Time</th>
+          <th>Carrier/LSP</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="orderList">
+        <tr><td colspan="7" class="loading">Loading orders...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="button-group">
+    <button class="add-btn" onclick="showAddForm()">+ Add Order</button>
+    <button class="upload-btn" id="uploadBtn" onclick="triggerUpload()">📥 Upload Excel</button>
+    <button class="remove-all-btn" onclick="showRemoveAllModal()">🗑️ Remove All</button>
+  </div>
+
+  <!-- Hidden file input for upload -->
+  <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none;" />
+</div>
+
+<div id="removeAllModal" class="modal-overlay">
+  <div class="modal">
+    <h3>⚠️ Remove All Orders</h3>
+    <p style="font-weight: 600; margin: 10px 0;">Are you sure you want to delete <strong>ALL</strong> orders? This action cannot be undone.</p>
+    <p style="font-weight: 600; color: #dc3545;" id="orderCountText">Total orders: 0</p>
+    <div class="modal-actions">
+      <button class="cancel-btn" onclick="closeRemoveAllModal()">Cancel</button>
+      <button class="confirm-btn" onclick="removeAllOrders()">Yes, Remove All</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* =========================================
+     LOCAL API
+     ========================================= */
+  const API_BASE = '/api';
+
+  const FIELDS = ['Order', 'Customer PO', '_1', 'Planned Delivery Date', 'Carrier/LSP', 'Status'];
+  const FIELD_LABELS = {
+    'Order': 'Order',
+    'Customer PO': 'Customer PO',
+    '_1': 'Customer',
+    'Planned Delivery Date': 'Planned Delivery Time',
+    'Carrier/LSP': 'Carrier/LSP',
+    'Status': 'Status'
+  };
+
+  let currentOrders = [];
+  let currentSort = 'delivery';
+  const STATUS_OPTIONS = ['OPEN', 'CHECKED IN', 'SHIPPED', 'LATE', 'CANCEL'];
+
+  function getOrderKey(order) {
+    if (!order) return null;
+    const val = order['Order'];
+    if (val === undefined || val === null || String(val).trim() === '') return null;
+    return { column: 'Order', value: val };
+  }
+
+  function showRemoveAllModal() {
+    document.getElementById('orderCountText').textContent = 'Total orders: ' + currentOrders.length;
+    document.getElementById('removeAllModal').style.display = 'flex';
+  }
+  function closeRemoveAllModal() {
+    document.getElementById('removeAllModal').style.display = 'none';
+  }
+
+  async function removeAllOrders() {
+    try {
+      if (currentOrders.length === 0) {
+        showError('No orders to remove.');
+        closeRemoveAllModal();
+        return;
+      }
+      const response = await fetch(API_BASE + '/orders', { method: 'DELETE' });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to delete all orders');
+      }
+      const result = await response.json();
+      showSuccess('✅ Removed ' + result.deletedCount + ' order(s) successfully!');
+      closeRemoveAllModal();
+      setTimeout(() => loadOrders(), 500);
+    } catch (e) {
+      showError('Error: ' + e.message);
+      closeRemoveAllModal();
+    }
+  }
+
+  /* =========================================
+     EXCEL / CSV UPLOAD
+     ========================================= */
+  function triggerUpload() {
+    document.getElementById('fileInput').click();
+  }
+
+  document.getElementById('fileInput').addEventListener('change', async function () {
+    const file = this.files && this.files[0];
+    if (!file) return;
+
+    const btn = document.getElementById('uploadBtn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Uploading...';
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(API_BASE + '/orders/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Upload failed');
+
+      showSuccess('✅ Imported ' + result.imported + ' row(s) from ' + file.name);
+      setTimeout(() => loadOrders(), 400);
+    } catch (e) {
+      showError('Upload error: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+      this.value = ''; // reset input so same file can be re-uploaded
+    }
+  });
+
+  /* =========================================
+     DATE PARSING
+     ========================================= */
+  function parseDeliveryDate(value) {
+    if (value === null || value === undefined) return null;
+    const text = String(value).trim();
+    if (!text) return null;
+
+    // Try native Date first (handles ISO, US formats, etc.)
+    const native = new Date(text);
+    if (!isNaN(native.getTime())) return native.getTime();
+
+    // DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+    let m = text.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+    if (m) {
+      let day = Number(m[1]);
+      let month = Number(m[2]);
+      let year = Number(m[3]);
+      if (year < 100) year += 2000;
+      // If first number > 12, it must be a day (DD/MM)
+      if (day > 12) {
+        return new Date(year, month - 1, day).getTime();
+      }
+      // Otherwise ambiguous — assume DD/MM/YYYY (European)
+      return new Date(year, month - 1, day).getTime();
+    }
+
+    // YYYY/MM/DD or YYYY-MM-DD
+    m = text.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+    if (m) {
+      return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime();
+    }
+
+    // Time-only like "14:30" — use today's date
+    m = text.match(/^(\d{1,2}):(\d{2})/);
+    if (m) {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate(), Number(m[1]), Number(m[2])).getTime();
+    }
+
+    return null;
+  }
+
+  /* =========================================
+     SORTING
+     ========================================= */
+  function sortOrders(sortType) {
+    currentSort = sortType;
+    document.querySelectorAll('.sort-btn').forEach(btn => btn.classList.remove('active'));
+    const btnMap = { delivery: 'sortDelivery', status: 'sortStatus', customer: 'sortCustomer' };
+    const activeBtn = document.getElementById(btnMap[sortType]);
+    if (activeBtn) activeBtn.classList.add('active');
+    if (!currentOrders || currentOrders.length === 0) return;
+
+    let sortedOrders = [...currentOrders];
+
+    if (sortType === 'delivery') {
+      sortedOrders.sort((a, b) => {
+        const timeA = parseDeliveryDate(a['Planned Delivery Date']);
+        const timeB = parseDeliveryDate(b['Planned Delivery Date']);
+        if (timeA === null && timeB === null) return 0;
+        if (timeA === null) return 1;   
+        if (timeB === null) return -1;
+        return timeA - timeB;
+      });
+    } else if (sortType === 'status') {
+      const statusOrder = { 'OPEN': 0, 'CHECKED IN': 1, 'SHIPPED': 2, 'LATE': 3, 'CANCEL': 4 };
+      sortedOrders.sort((a, b) => {
+        const statusA = String(a['Status'] || 'OPEN').toUpperCase();
+        const statusB = String(b['Status'] || 'OPEN').toUpperCase();
+        const cmp = (statusOrder[statusA] ?? 0) - (statusOrder[statusB] ?? 0);
+        if (cmp !== 0) return cmp;
+        const timeA = parseDeliveryDate(a['Planned Delivery Date']);
+        const timeB = parseDeliveryDate(b['Planned Delivery Date']);
+        if (timeA === null && timeB === null) return 0;
+        if (timeA === null) return 1;
+        if (timeB === null) return -1;
+        return timeA - timeB;
+      });
+    } else if (sortType === 'customer') {
+      sortedOrders.sort((a, b) => {
+        const customerA = String(a['_1'] ?? '').trim();
+        const customerB = String(b['_1'] ?? '').trim();
+        const cmp = customerA.localeCompare(customerB, undefined, { sensitivity: 'base' });
+        if (cmp !== 0) return cmp;
+        const timeA = parseDeliveryDate(a['Planned Delivery Date']);
+        const timeB = parseDeliveryDate(b['Planned Delivery Date']);
+        if (timeA === null && timeB === null) return 0;
+        if (timeA === null) return 1;
+        if (timeB === null) return -1;
+        return timeA - timeB;
+      });
+    }
+    renderOrders(sortedOrders);
+  }
+
+  /* =========================================
+     ADD FORM
+     ========================================= */
+  function showAddForm() {
+    document.getElementById('addForm').style.display = 'block';
+    generateFormFields();
+  }
+  function closeForm() {
+    document.getElementById('addForm').style.display = 'none';
+  }
+
+  function generateFormFields() {
+    const container = document.getElementById('formFields');
+    container.innerHTML = '';
+
+    FIELDS.forEach(col => {
+      const div = document.createElement('div');
+      div.style.marginBottom = '8px';
+
+      const label = document.createElement('label');
+      label.textContent = (FIELD_LABELS[col] || col) + ': ';
+      label.style.display = 'inline-block';
+      label.style.marginRight = '5px';
+      label.style.fontWeight = '700';
+      label.style.fontSize = '13px';
+      label.style.minWidth = '170px';
+
+      if (col === 'Status') {
+        const select = document.createElement('select');
+        select.id = 'field_' + col;
+        select.style.padding = '6px';
+        select.style.margin = '5px 15px 5px 0';
+        select.style.border = '1px solid #ddd';
+        select.style.borderRadius = '4px';
+        select.style.fontSize = '13px';
+        select.style.minWidth = '150px';
+        select.style.fontWeight = '600';
+        select.style.color = '#333';
+        STATUS_OPTIONS.forEach(option => {
+          const opt = document.createElement('option');
+          opt.value = option;
+          opt.textContent = option;
+          if (option === 'OPEN') opt.selected = true;
+          select.appendChild(opt);
+        });
+        div.appendChild(label);
+        div.appendChild(select);
+      } else {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = 'field_' + col;
+        input.placeholder = 'Enter ' + (FIELD_LABELS[col] || col);
+        input.style.width = '220px';
+        input.style.padding = '6px';
+        input.style.margin = '5px 15px 5px 0';
+        input.style.border = '1px solid #ddd';
+        input.style.borderRadius = '4px';
+        input.style.fontWeight = '600';
+        div.appendChild(label);
+        div.appendChild(input);
+      }
+      container.appendChild(div);
+    });
+
+    const firstInput = container.querySelector('input');
+    if (firstInput) firstInput.focus();
+  }
+
+  async function submitOrder() {
+    const formData = {};
+    document.querySelectorAll('#formFields input').forEach(input => {
+      const fieldName = input.id.replace('field_', '');
+      if (input.value.trim()) formData[fieldName] = input.value.trim();
+    });
+    document.querySelectorAll('#formFields select').forEach(select => {
+      const fieldName = select.id.replace('field_', '');
+      if (select.value) formData[fieldName] = select.value;
+    });
+
+    if (Object.keys(formData).length === 0) {
+      showError('Please fill in at least one field');
+      return;
+    }
+    if (!formData['Order']) {
+      showError('Order is required');
+      return;
+    }
+
+    try {
+      const response = await fetch(API_BASE + '/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to insert order');
+      }
+      showSuccess('✅ Order added successfully!');
+      closeForm();
+      setTimeout(() => loadOrders(), 500);
+    } catch (e) {
+      showError('Error: ' + e.message);
+    }
+  }
+
+  /* =========================================
+     UPDATE / DELETE / LOAD / RENDER
+     ========================================= */
+  async function updateStatus(orderKey, newStatus) {
+    try {
+      if (!orderKey || !orderKey.column || orderKey.value === undefined || orderKey.value === null) {
+        showError('Could not identify order to update');
+        return;
+      }
+      const response = await fetch(API_BASE + '/orders/' + encodeURIComponent(orderKey.value), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ column: orderKey.column, 'Status': newStatus })
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to update status');
+      }
+      showSuccess('✅ Status updated to ' + newStatus);
+      setTimeout(() => loadOrders(), 300);
+    } catch (e) {
+      showError('Error: ' + e.message);
+    }
+  }
+
+  async function loadOrders() {
+    try {
+      const response = await fetch(API_BASE + '/orders');
+      if (!response.ok) throw new Error('Server responded with ' + response.status);
+      const data = await response.json();
+      setConnection(true);
+      currentOrders = data || [];
+
+      if (data && data.length > 0) {
+        sortOrders(currentSort);
+      } else {
+        document.getElementById("orderList").innerHTML = `
+          <tr><td colspan="7" style="text-align:center;padding:20px;color:#777;font-weight:600;">
+            No orders yet. Click "+ Add Order" or "Upload Excel"
+          </td></tr>
+        `;
+      }
+    } catch (e) {
+      showError('Error loading orders: ' + e.message);
+      setConnection(false);
+    }
+  }
+
+  function renderOrders(orders) {
+    const list = document.getElementById("orderList");
+    list.innerHTML = "";
+    if (!orders || orders.length === 0) {
+      list.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#777;font-weight:600;">No orders yet.</td></tr>`;
+      return;
+    }
+
+    orders.forEach((order) => {
+      const row = document.createElement("tr");
+      const orderVal        = order['Order'] || '';
+      const customerPO      = order['Customer PO'] || '';
+      const customer        = order['_1'] || '';
+      const plannedDelivery = order['Planned Delivery Date'] || '';
+      const carrier         = order['Carrier/LSP'] || '';
+      const currentStatus   = order['Status'] || 'OPEN';
+
+      const statusClass = String(currentStatus).toUpperCase().replace(/ /g, '-');
+      let rowClass = 'row-OPEN';
+      if (statusClass === 'CHECKED-IN') rowClass = 'row-CHECKED-IN';
+      else if (statusClass === 'SHIPPED') rowClass = 'row-SHIPPED';
+      else if (statusClass === 'LATE') rowClass = 'row-LATE';
+      else if (statusClass === 'CANCEL') rowClass = 'row-CANCEL';
+      row.className = rowClass;
+
+      const orderKey = getOrderKey(order);
+
+      const statusSelect = document.createElement('select');
+      statusSelect.className = 'status-select ' + statusClass;
+      statusSelect.style.padding = '4px 6px';
+      statusSelect.style.borderRadius = '4px';
+      statusSelect.style.border = '1px solid #ddd';
+      statusSelect.style.fontSize = '12px';
+      statusSelect.style.width = '100%';
+      statusSelect.style.cursor = 'pointer';
+      statusSelect.style.fontWeight = '700';
+      statusSelect.style.color = '#333';
+
+      STATUS_OPTIONS.forEach(option => {
+        const opt = document.createElement('option');
+        opt.value = option;
+        opt.textContent = option;
+        if (option.toLowerCase() === String(currentStatus).toLowerCase()) opt.selected = true;
+        statusSelect.appendChild(opt);
+      });
+
+      statusSelect.addEventListener('change', function() {
+        updateStatus(orderKey, this.value);
+      });
+
+      row.innerHTML = `
+        <td><span class="data-value">${escapeHtml(String(orderVal))}</span></td>
+        <td><span class="data-value">${escapeHtml(String(customerPO))}</span></td>
+        <td><span class="data-value">${escapeHtml(String(customer))}</span></td>
+        <td><span class="data-value">${escapeHtml(String(plannedDelivery))}</span></td>
+        <td><span class="data-value">${escapeHtml(String(carrier))}</span></td>
+        <td></td>
+        <td><div class="action-cell"><button class="remove-btn">Remove</button></div></td>
+      `;
+
+      row.querySelector('td:nth-child(6)').appendChild(statusSelect);
+      row.querySelector('.remove-btn').addEventListener('click', () => removeOrder(orderKey));
+      list.appendChild(row);
+    });
+  }
+
+  async function removeOrder(orderKey) {
+    try {
+      if (!orderKey || !orderKey.column || orderKey.value === undefined || orderKey.value === null) {
+        showError('Could not identify order to remove');
+        return;
+      }
+      const response = await fetch(API_BASE + '/orders/' + encodeURIComponent(orderKey.value), {
+        method: 'DELETE'
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to delete order');
+      }
+      showSuccess('✅ Order removed successfully!');
+      setTimeout(() => loadOrders(), 300);
+    } catch (e) {
+      showError('Delete error: ' + e.message);
+    }
+  }
+
+  /* =========================================
+     HELPERS
+     ========================================= */
+  function setConnection(online) {
+    const dot = document.getElementById("connectionDot");
+    const text = document.getElementById("connectionText");
+    if (online) {
+      dot.className = "online-dot";
+      text.textContent = "Online";
+    } else {
+      dot.className = "offline-dot";
+      text.textContent = "Connection problem — is the server running?";
+    }
+  }
+
+  function showSuccess(message) {
+    const box = document.getElementById("successMessage");
+    box.textContent = message;
+    box.style.display = "block";
+    setTimeout(() => { box.style.display = "none"; }, 5000);
+  }
+
+  function showError(message) {
+    const box = document.getElementById("errorMessage");
+    box.textContent = "Error: " + message;
+    box.style.display = "block";
+    setTimeout(() => { box.style.display = "none"; }, 6000);
+  }
+
+  function showInfo(message) {
+    const box = document.getElementById("infoMessage");
+    box.textContent = message;
+    box.style.display = "block";
+    setTimeout(() => { box.style.display = "none"; }, 6000);
+  }
+
+  function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  let pollInterval = null;
+  function init() {
+    loadOrders();
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(loadOrders, 5000);
+  }
+  init();
+</script>
+</body>
+</html>
